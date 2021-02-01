@@ -1,0 +1,9 @@
+# Time-averaged data for fix myRDF
+# TimeStep Number-of-rows
+# Row c_myRDF[1] c_myRDF[2] c_myRDF[3]
+0 5
+1 0.15 1.42612 0.0625
+2 0.45 1.22239 0.4375
+3 0.75 1.20094 1.4375
+4 1.05 0.732332 2.625
+5 1.35 1.23909 5.9375
