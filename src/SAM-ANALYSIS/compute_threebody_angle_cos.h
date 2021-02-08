@@ -13,48 +13,26 @@
 
 #ifdef COMPUTE_CLASS
 
-ComputeStyle(threebody,ComputeThreeBody)
+ComputeStyle(threebody/angle/cos,ComputeThreeBodyAngleCos)
 
 #else
 
-#ifndef LMP_COMPUTE_THREEBODY_H
-#define LMP_COMPUTE_THREEBODY_H
+#ifndef LMP_COMPUTE_THREEBODY_ANGLE_COS_H
+#define LMP_COMPUTE_THREEBODY_ANGLE_COS_H
 
-#include "compute.h"
+#include "compute_threebody.h"
 
 namespace LAMMPS_NS {
 
-class ComputeThreeBody : public Compute {
+class ComputeThreeBodyAngleCos : public ComputeThreeBody {
  public:
-  ComputeThreeBody(class LAMMPS *, int, char **,bool alloc_arrays=true);
-  ~ComputeThreeBody();
-  void init();
-  void init_list(int, class NeighList *);
+  ComputeThreeBodyAngleCos(class LAMMPS *, int, char **);
+  ~ComputeThreeBodyAngleCos();
+
   void compute_array();
 
- protected:
-  int npos_bins;                 // # of u, v bins total
-  int nangle_bins;               // # of alpha bins
-  int cutflag;                   // user cutoff flag
-
-  bigint nbin_total;             // nbin_dist*nbin_dist*nbin_theta
-  double deldist,deldistinv;     // bin width and its inverse for distance
-  double delalpha,delalphainv;   // bin width and its inverse for angle
-  double cutoff_user;            // user-specified cutoff
-  double mycutneigh;             // user-specified cutoff + neighbor skin
-  int nskip;                     // user-specified number of bins to skip in saving
-  double ***hist;                 // histogram bins
-  double ***histall;              // summed histogram bins across all procs
-
-  int typecount;
-  int icount,jcount;
-  int duplicates;
-
-  class NeighList *list; // half neighbor list
-  void init_norm();
-  bigint natoms_old;
-
  private:
+  
   void set_array(double, double,
 		 double (*)(double,double,double,double,double,int));
 

@@ -15,7 +15,7 @@
    Contributing author: Sam Cameron
 ------------------------------------------------------------------------- */
 
-#include "compute_threebody.h"
+#include "compute_threebody_angle_cos.h"
 #include <mpi.h>
 #include <stdio.h>
 #include <cmath>
@@ -44,216 +44,39 @@ static double compute_3Dvf(double ulower, double uupper,
 
 static double compute_2Dvf(double ulower, double uupper,
 			   double vlower, double vupper,
-			   double /* delalpha */,
-			   int /* alpha_bin */);
+			   double delalpha, int alpha_bin );
 
-static int flat_index(int ubin, int vbin, int abin, int Nuv, int Na,
-		      int nskip);
+static int flat_index(int ubin, int vbin, int Nuv,int nskip);
 
 /* ---------------------------------------------------------------------- */
 
-ComputeThreeBody::ComputeThreeBody(LAMMPS *lmp, int narg, char **arg,
-				   bool alloc_array) :
-  Compute(lmp, narg, arg),
-  hist(nullptr), histall(nullptr)
+ComputeThreeBodyAngleCos::ComputeThreeBodyAngleCos(LAMMPS *lmp, int narg, char **arg) :
+  ComputeThreeBody(lmp, narg, arg,false)
 {
-  if (narg < 5)
-    error->all(FLERR,"Illegal compute three body command");
-
-  array_flag = 1;
-  extarray = 0;
-
-  npos_bins = utils::inumeric(FLERR,arg[3],false,lmp);
-  if (npos_bins < 1) error->all(FLERR,"Illegal compute three body command");
-
-  nangle_bins = utils::inumeric(FLERR,arg[4],false,lmp);
-  if (nangle_bins < 1) error->all(FLERR,"Illegal compute three body command");
-
-  nbin_total = npos_bins*npos_bins*nangle_bins;
-  // optional args
-  // nargpair = # of pairwise args, starting at iarg = 5
-
-  cutflag = 0;
-  nskip = 0;
-
-
-  int iarg = 5;
-  while (iarg < narg) {
-    if (strcmp(arg[iarg],"cutoff") == 0) {
-      cutoff_user = utils::numeric(FLERR,arg[iarg+1],false,lmp);
-      if (cutoff_user <= 0.0) cutflag = 0;
-      else cutflag = 1;
-      iarg += 2;
-    } else if (strcmp(arg[iarg],"skip") == 0) {
-      nskip = utils::numeric(FLERR,arg[iarg+1],false,lmp);
-      iarg += 2;
-    } else error->all(FLERR,"Illegal compute threebody command");
-  }
-
-  if (force->newton_pair) {
-    error->all(FLERR,"compute threebody command is incompatible with "
-	       "newton pair being on.");
-  }
-
-  // pairwise args, fix it to be always one set of pairs for now,
-  // but might change this later to deal with density differences
-
-  delalpha = MY_PI/nangle_bins;
-
-  delalphainv = 1.0/delalpha;
-
-
-  int ntypes = atom->ntypes;
-  if (ntypes != 1) {
-    error->all(FLERR,"Cannot compute threebody for system with multiple "
-	       "atom types.");
-  }
-
+  
+  size_array_rows = (npos_bins-2*nskip)*(npos_bins-2*nskip+1)/2;
+  size_array_cols = 3;
 
   
-  size_array_rows = (npos_bins-2*nskip)*(npos_bins-2*nskip+1)*nangle_bins/2;
-  size_array_cols = 4;
+  memory->create(array,size_array_rows,size_array_cols,"rdf:array");  
   
-  memory->create(hist,nangle_bins,npos_bins,npos_bins,"rdf:hist");
-  memory->create(histall,nangle_bins,npos_bins,npos_bins,"rdf:histall");    
-
-  if (alloc_array) {
-
-
-    memory->create(array,size_array_rows,size_array_cols,"rdf:array");  
-
-  }
   dynamic = 0;
   natoms_old = 0;
 }
 
 /* ---------------------------------------------------------------------- */
 
-ComputeThreeBody::~ComputeThreeBody()
+ComputeThreeBodyAngleCos::~ComputeThreeBodyAngleCos()
 {
   memory->destroy(hist);
   memory->destroy(histall);
   memory->destroy(array);
 }
 
-/* ---------------------------------------------------------------------- */
-
-void ComputeThreeBody::init()
-{
-
-  if (!force->pair && !cutflag)
-    error->all(FLERR,"Compute threebody requires a pair style be defined "
-               "or cutoff specified");
-
-  if (cutflag) {
-    double skin = neighbor->skin;
-    mycutneigh = cutoff_user + skin;
-
-    double cutghost;            // as computed by Neighbor and Comm
-    if (force->pair)
-      cutghost = MAX(force->pair->cutforce+skin,comm->cutghostuser);
-    else
-      cutghost = comm->cutghostuser;
-
-    if (mycutneigh > cutghost)
-      error->all(FLERR,"Compute threebody cutoff exceeds ghost atom range - "
-                 "use comm_modify cutoff command");
-    if (force->pair && mycutneigh < force->pair->cutforce + skin)
-      if (comm->me == 0)
-        error->warning(FLERR,"Compute threebody cutoff less than neighbor "
-		       "cutoff - "
-                       "forcing a needless neighbor list build");
-
-    
-    deldist = cutoff_user / npos_bins;
-
-  } else deldist = force->pair->cutforce / npos_bins;
-
-  deldistinv = 1.0/deldist;
-
-
-  // since this file is going to be huge, don't include coordinates in it.
-
-  //  for (int i = 0; i < nbin; i++)
-  //array[i][0] = (i+0.5) * delr;
-
-  // initialize normalization, finite size correction, and changing atom counts
-  // ...not sure what this does
-
-  natoms_old = atom->natoms;
-  dynamic = group->dynamic[igroup];
-  if (dynamic_user) dynamic = 1;
-  init_norm();
-
-  // need an occasional half neighbor list
-  // if user specified, request a cutoff = cutoff_user + skin
-  // skin is included b/c Neighbor uses this value similar
-  //   to its cutneighmax = force cutoff + skin
-  // also, this NeighList may be used by this compute for multiple steps
-  //   (until next reneighbor), so it needs to contain atoms further
-  //   than cutoff_user apart, just like a normal neighbor list does
-
-  int irequest = neighbor->request(this,instance_me);
-  neighbor->requests[irequest]->pair = 0;
-  neighbor->requests[irequest]->compute = 1;
-  neighbor->requests[irequest]->occasional = 1;
-  if (cutflag) {
-    neighbor->requests[irequest]->cut = 1;
-    neighbor->requests[irequest]->cutoff = mycutneigh;
-  }
-  // need full neighbor list
-  neighbor->requests[irequest]->half = 0;
-  neighbor->requests[irequest]->full = 1;
-  
-}
 
 /* ---------------------------------------------------------------------- */
 
-void ComputeThreeBody::init_list(int /*id*/, NeighList *ptr)
-{
-  list = ptr;
-}
-
-/* ---------------------------------------------------------------------- */
-
-void ComputeThreeBody::init_norm()
-{
-  int i,j,m;
-
-  // count atoms of each type that are also in group
-
-  const int nlocal = atom->nlocal;
-  const int ntypes = atom->ntypes;
-  const int * const mask = atom->mask;
-
-  //here
-  typecount = 0;
-  for (i = 0; i < nlocal; i++)
-    if (mask[i] & groupbit) typecount++;
-
-
-
-  icount = typecount;
-
-  jcount = typecount;
-
-  duplicates = typecount;
-
-
-  int scratch;
-  MPI_Allreduce(&icount,&scratch,1,MPI_INT,MPI_SUM,world);
-  icount = scratch;
-  MPI_Allreduce(&jcount,&scratch,1,MPI_INT,MPI_SUM,world);
-  jcount = scratch;
-  MPI_Allreduce(&duplicates,&scratch,1,MPI_INT,MPI_SUM,world);
-  duplicates = scratch;
-
-
-}
-
-/* ---------------------------------------------------------------------- */
-
-void ComputeThreeBody::compute_array()
+void ComputeThreeBodyAngleCos::compute_array()
 // ======================================================================
 // Only counting triplets where all three distances are less than cutoff
 // away.
@@ -454,16 +277,17 @@ void ComputeThreeBody::compute_array()
 
 }
 
-void ComputeThreeBody::set_array(double constant, double normfac,
-				 double (*vf)(double,double,double,
-					      double,double,int))
+void ComputeThreeBodyAngleCos::set_array(double constant, double normfac,
+					 double (*vf)(double,double,double,
+						      double,double,int))
 {
   double ulower,uupper,vlower,vupper;
   double vfrac;
 
   int alpha_bin,ij_bin,ik_bin;
+  double cosalpha;
   double gr;
-
+  
   int flat;
   
 
@@ -478,26 +302,24 @@ void ComputeThreeBody::set_array(double constant, double normfac,
       vlower = ik_bin*deldist;
       vupper = (ik_bin+1)*deldist;	  
 
+      gr = 0.0;
       
       for (alpha_bin = 0; alpha_bin < nangle_bins; alpha_bin ++ ) {
 
 	
 	vfrac = constant * vf(ulower,uupper,vlower,vupper,delalpha,
 			      alpha_bin);
-	
+
 	if (vfrac * normfac != 0.0) {
-	  gr = histall[alpha_bin][ij_bin][ik_bin]/(vfrac *normfac);
+	  gr += histall[alpha_bin][ij_bin][ik_bin]/(vfrac *normfac);
 	} else {
-	  gr = 0.0;
+	  gr += 0.0;
 	}
 
-	flat = flat_index(ij_bin, ik_bin, alpha_bin, npos_bins,
-			  nangle_bins,nskip);
+	flat = flat_index(ij_bin, ik_bin, npos_bins,nskip);
 	array[flat][0] = (ij_bin + 0.5)*deldist;
 	array[flat][1] = (ik_bin + 0.5)*deldist;
-	array[flat][2] = (alpha_bin + 0.5)*delalpha;
-
-	array[flat][3] = gr;
+	array[flat][2] = gr;
       }
     }
   }
@@ -518,26 +340,27 @@ double compute_3Dvf(double ulower, double uupper,
    
   return ((uupper*uupper*uupper - ulower*ulower*ulower)/3.0
 	  * (vupper*vupper*vupper - vlower*vlower*vlower)/3.0
-	  * (aupper-alower));
+	  * (aupper-alower)
+	  / ( cos((alpha_bin + 0.5)*delalpha)
+	      *sin((alpha_bin + 0.5)*delalpha)*delalpha));
 }
 
 double compute_2Dvf(double ulower, double uupper,
 		    double vlower, double vupper,
-		    double delalpha,
-		    int /* alpha_bin */)
+		    double delalpha,int  alpha_bin )
 {
 
   return ( (uupper*uupper - ulower*ulower)/2.0
-	   * (vupper*vupper - vlower*vlower)/2.0*delalpha);
+	   * (vupper*vupper - vlower*vlower)/2.0
+	   /(  2*cos((alpha_bin+0.5)*delalpha)));
 }
 
 
 
-int flat_index(int ubin, int vbin, int abin, int Nuv, int Na,
-	       int nskip)
+int flat_index(int ubin, int vbin, int Nuv,int nskip)
 {
 
   int udum = ubin - nskip;
-  return abin + (vbin-nskip + udum*(Nuv-2*nskip+1)
-		 - (udum * (udum+1) ) / 2)*Na;
+  return (vbin-nskip + udum*(Nuv-2*nskip+1)
+	  - (udum * (udum+1) ) / 2);
 }
