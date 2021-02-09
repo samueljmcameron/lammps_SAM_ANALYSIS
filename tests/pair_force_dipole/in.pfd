@@ -1,0 +1,23 @@
+atom_style       hybrid dipole sphere
+atom_modify      map array
+neigh_modify     delay 2 every 2 check no
+units            lj
+newton           on
+
+
+
+read_data        data.dipole
+
+pair_style lj/cut 2.5
+pair_coeff * * 1.0 1.0 1.1224
+pair_modify shift yes
+
+
+compute pfd all pair/force/dipole
+
+thermo_style   custom step c_pfd
+thermo 1
+
+
+
+rerun dump.lammpstrj dump x y mux muy
