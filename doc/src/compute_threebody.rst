@@ -1,17 +1,22 @@
 .. index:: compute threebody
+.. index:: compute threebody/angle/cos
 
 compute threebody command
 =========================
+
+
+compute threebody/angle/cos command
+===================================
 
 Syntax
 """"""
 
 .. parsed-literal::
 
-   compute ID group-ID threebody Nposbins Nanglebins keyword/value ...
+   compute ID group-ID style_name Nposbins Nanglebins keyword/value ...
 
 * ID, group-ID are documented in :doc:`compute <compute>` command
-* threebody = style name of this compute command
+* style_name = *threebody* or *threebody/angle/cos*
 * Nposbin = number of bins in radial positions u and v
 * Nanglebins = number of bins in angular distribution
 * zero or more keyword/value pairs may be appended
@@ -200,7 +205,7 @@ example:
 Output info
 """""""""""
 
-This compute outputs a global array with the number of rows =
+Compute style *threebody* outputs a global array with the number of rows =
 :math:`(N_p-2n_s)(N_p-2n_s+1)N_a/2`, where :math:`N_p` = *Nposbins*,
 :math:`n_s` = *nskip* (which is zero if not specified) and
 :math:`N_a` = *Nanglebins*. The reason for this strange number is
@@ -224,6 +229,21 @@ This output may seem complex,
 but it allows for more compact storage of this data, while also
 avoiding the domain where the calculation is invalid.
 
+Compute style *threebody/angle/cos* outputs a global array where
+:math:`g^{(3)}(u,v,\alpha_{uv})` multiplied by an angular factor
+:math:`\cos\alpha_{uv}` is integrated over the angle coordinate, i.e.
+      
+.. math::
+   2\int_0^{\pi}g^{(3)}_{2d}(u,v,\alpha_{uv})\cos\alpha_{uv}
+   d\alpha_{uv},\\
+   \int_0^{\pi} g^{(3)}_{3d}(u,v,\alpha_{uv})\cos\alpha_{uv}
+   \sin\alpha_{uv} d\alpha_{uv}.
+
+The angle integral is computed via summing over the *Nanglebins*.
+The resulting arrays are therefore only dependent on the two
+position coordinates :math:`u` and :math:`v`, and so the output
+reflects this (but is otherwise the same as described for the
+*threebody* compute style).
 
 See the :doc:`Howto output <Howto_output>` doc page for an overview of
 LAMMPS output options.
