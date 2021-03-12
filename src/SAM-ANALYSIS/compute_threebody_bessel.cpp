@@ -326,7 +326,9 @@ void ComputeThreeBodyBessel::compute_array()
       yij = x[j][1]-ytmp;
       zij = x[j][2]-ztmp;
       rij = sqrt(xij*xij+yij*yij+zij*zij);
-
+      ij_bin = static_cast<int> (rij*deldistinv);
+      
+      if (ij_bin >= npos_bins) continue;
       
       hist[0][ij_bin] += bessk1(sqrtPi2fac*rij);
       hist[1][ij_bin] += bessk1(sqrtPi2fac*rij)*Vp_divide_r(factor_lj,rij)*rij;
@@ -358,7 +360,7 @@ void ComputeThreeBodyBessel::compute_array()
 	
 	dum_cosalpha = (xij*xik + yij*yik + zij*zik)/(rij*rik);
 
-	ij_bin = static_cast<int> (rij*deldistinv);
+
 	ik_bin = static_cast<int> (rik*deldistinv);
 	dum_jk_bin = static_cast<int> (rjk*deldistinv);
 
