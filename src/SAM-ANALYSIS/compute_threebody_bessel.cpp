@@ -38,6 +38,7 @@ using namespace LAMMPS_NS;
 using namespace MathConst;
 
 static double bessk1( double x );
+static double Vp_divide_r(double factorlj, double rij);
 
 /* ---------------------------------------------------------------------- */
 
@@ -96,10 +97,10 @@ ComputeThreeBodyBessel::ComputeThreeBodyBessel(LAMMPS *lmp, int narg, char **arg
 
   
   size_array_rows = npos_bins;
-  size_array_cols = 2;
+  size_array_cols = 5;
   
-  memory->create(hist,npos_bins,"rdf:hist");
-  memory->create(histall,npos_bins,"rdf:histall");    
+  memory->create(hist,4,npos_bins,"rdf:hist");
+  memory->create(histall,4,npos_bins,"rdf:histall");    
 
   memory->create(array,size_array_rows,size_array_cols,"rdf:array");  
 
@@ -273,9 +274,13 @@ void ComputeThreeBodyBessel::compute_array()
 
   // zero the histogram counts
 
-  for (i = 0; i < npos_bins; i++)
-    hist[i] = 0;
-
+  for (i = 0; i < npos_bins; i++) {
+    hist[0][i] = 0;
+    hist[1][i] = 0;
+    hist[2][i] = 0;
+    hist[3][i] = 0;
+  }
+    
   // tally the three body
   // both atom i and j must be in fix group
   // itype,jtype must have been specified by user
@@ -315,6 +320,9 @@ void ComputeThreeBodyBessel::compute_array()
 
 
       if (!(mask[j] & groupbit)) continue;
+
+      hist[0][ij_bin] += bessk1(sqrtPi2fac*rij);
+      hist[1][ij_bin] += bessk1(sqrtPi2fac*rij)*Vp_divide_r(factor_lj,rij)*rij;
 
       for (kk = 0; kk < jnum; kk++) {
 	if (jj == kk) continue;
@@ -368,43 +376,66 @@ void ComputeThreeBodyBessel::compute_array()
 	if (ij_bin >= npos_bins || ik_bin >=npos_bins
 	    || dum_jk_bin >= npos_bins) continue;
 
-	hist[ij_bin] += bessk1(sqrtPi2fac*rik)*dum_cosalpha;
+	hist[2][ij_bin] += bessk1(sqrtPi2fac*rik)*dum_cosalpha;
+	hist[3][ij_bin] += bessk1(sqrtPi2fac*rik)*dum_cosalpha*Vp_divide_r(factor_lj,rij)*rij;
+
 
       }
+
     }
   }
 
   // sum histograms across procs
 
-  MPI_Allreduce(hist,histall,npos_bins,MPI_DOUBLE,MPI_SUM,world);
+  MPI_Allreduce(hist[0],histall[0],4*npos_bins,MPI_DOUBLE,MPI_SUM,world);
 
   // convert counts to k(r) and coord(r) and copy into output array
   // vfrac = fraction of volume in shell m
   // npairs = number of pairs, corrected for duplicates
   // duplicates = pairs in which both atoms are the same
 
-  double constant,vfrac,tmpout,rlower,rupper,normfac;
+  double constant,vfrac,twobod_tmp,threebod_tmp;
+  double rlower,rupper,normfac;
+  double twobod_ncoord, threebod_ncoord;
+  double rhoN;
 
 
   if (domain -> dimension == 2) {
     constant = MY_PI / (domain->xprd*domain->yprd);
 
+
+
+
     normfac = (icount > 0) ? static_cast<double>(jcount)
                 - static_cast<double>(duplicates)/icount : 0.0;
+
+    rhoN = icount*normfac/(domain->xprd*domain->yprd);
+
+    
+    twobod_ncoord = 0.0;
+    threebod_ncoord = 0.0;
     for (ij_bin = 0; ij_bin < npos_bins; ij_bin++) {
       rlower = ij_bin*deldist;
       rupper = (ij_bin+1)*deldist;
       vfrac = constant * (rupper*rupper - rlower*rlower);
       if (vfrac * normfac != 0.0) {
 	
-	tmpout = histall[ij_bin] / (vfrac * normfac * icount);
-	
+	twobod_tmp = histall[0][ij_bin] / (vfrac * normfac * icount);
+	threebod_tmp = histall[2][ij_bin] / (vfrac * normfac * icount);
 	
       } else {
-	tmpout = 0.0;
+	twobod_tmp = 0.0;
+	threebod_tmp = 0.0;
       }
 
-      array[ij_bin][1] = tmpout;
+      if (icount != 0) {
+	twobod_ncoord += histall[1][ij_bin]/rhoN;
+	threebod_ncoord += histall[3][ij_bin]/rhoN;
+      }
+      array[ij_bin][1] = twobod_tmp;
+      array[ij_bin][2] = twobod_ncoord;
+      array[ij_bin][3] = threebod_tmp;
+      array[ij_bin][4] = threebod_ncoord;
     }
   } else {
     error->all(FLERR,"Cannot use compute threebody/bessel in a 3D system.");
@@ -460,3 +491,10 @@ static double bessk1( double x )
 }
 
 
+static double Vp_divide_r(double factorlj, double rij)
+{
+  if (rij > pow(2,1./6.)) return 0;
+  double r2inv = 1/(rij*rij);
+  double r6inv = r2inv*r2inv*r2inv;
+  return -24*r6inv*r2inv*(2*r6inv - 1);
+}

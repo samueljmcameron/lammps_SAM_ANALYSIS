@@ -41,8 +41,8 @@ class ComputeThreeBodyBessel : public Compute {
   double deldist,deldistinv;     // bin width and its inverse for distance
   double cutoff_user;            // user-specified cutoff
   double mycutneigh;             // user-specified cutoff + neighbor skin
-  double *hist;                 // histogram bins
-  double *histall;              // summed histogram bins across all procs
+  double **hist;                 // histogram bins
+  double **histall;              // summed histogram bins across all procs
 
   int typecount;
   int icount,jcount;

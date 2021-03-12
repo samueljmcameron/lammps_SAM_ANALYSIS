@@ -33,16 +33,40 @@ Examples
 Description
 """""""""""
 
-Define a computation that calculates the correlation function
-:math:`K^{(3)}(r)`, where :math:`r` is the distance
-between particles 1 and 2. This compute is still a three-body
-calculation because of it's definition,
+Define a computation that calculates the correlation functions
+:math:`K^{(2)}(r)`, :math:`V^{(2)}(r)`,
+:math:`K^{(3)}(r)`, and :math:`V^{(3)}(r)`, where :math:`r` is the distance
+between particles 1 and 2. This compute is a three-body
+calculation because of the latter two function definitions,
 
 .. math::
 
+   K^{(2)}(r) \equiv
+   = \frac{V}{N(N-1)}\sum_{i=1}^N\sum_{j\neq i}^N
+   \bigg<\delta^2(\mathbf{r}-\mathbf{r}_{ij})K_1(\sqrt{Pi/2}r_{ij})\bigg>.
+
+.. math::
+
+   V^{(2)}(r) \equiv
+   = \frac{V}{N(N-1)}\sum_{i=1}^N\sum_{j\neq i}^N\int_{|\mathbf{r}'|<r}
+   \bigg<\mathcal{V}'(r_{ij})K_1(\sqrt{Pi/2}r_{ij})\delta^2(\mathbf{r}'-\mathbf{r}_{ij})\bigg>.
+   
+.. math::
+
    K^{(3)}(r) \equiv
-   = \frac{V^3}{N^3}\sum_{i=1}^N\sum_{j\neq i}^N\sum_{k\neq j; k\neq i}^N
+   = \frac{V}{N(N-1)}\sum_{i=1}^N\sum_{j\neq i}^N\sum_{k\neq j; k\neq i}^N
    \bigg<\delta^2(\mathbf{r}-\mathbf{r}_{ij})K_1(\sqrt{Pi/2}r_{ik})
+   \cos\theta_{jk}\bigg>.
+
+and
+
+.. math::
+
+   V^{(3)}(r) \equiv
+   = \frac{V}{N(N-1)}\sum_{i=1}^N\sum_{j\neq i}^N\sum_{k\neq j; k\neq i}^N
+   \int_{|\mathbf{r}'|<r}
+   \bigg<\delta^2(\mathbf{r}'-\mathbf{r}_{ij})
+   \mathcal{V}'(r_{ij})K_1(\sqrt{Pi/2}r_{ik})
    \cos\theta_{jk}\bigg>.
 
 where :math:`K_1(x)` is the modified bessel function of the second kind
