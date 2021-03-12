@@ -321,6 +321,13 @@ void ComputeThreeBodyBessel::compute_array()
 
       if (!(mask[j] & groupbit)) continue;
 
+	
+      xij = x[j][0]-xtmp;
+      yij = x[j][1]-ytmp;
+      zij = x[j][2]-ztmp;
+      rij = sqrt(xij*xij+yij*yij+zij*zij);
+
+      
       hist[0][ij_bin] += bessk1(sqrtPi2fac*rij);
       hist[1][ij_bin] += bessk1(sqrtPi2fac*rij)*Vp_divide_r(factor_lj,rij)*rij;
 
@@ -337,16 +344,13 @@ void ComputeThreeBodyBessel::compute_array()
 
 	if (!(mask[k] & groupbit)) continue;
 
-	
-	xij = x[j][0]-xtmp;
-	yij = x[j][1]-ytmp;
-	zij = x[j][2]-ztmp;
+
 
 	xik = x[k][0]-xtmp;
 	yik = x[k][1]-ytmp;
 	zik = x[k][2]-ztmp;
 
-	rij = sqrt(xij*xij+yij*yij+zij*zij);
+
 	rik = sqrt(xik*xik+yik*yik+zik*zik);
 
 	rjk = sqrt((xik-xij)*(xik-xij)
