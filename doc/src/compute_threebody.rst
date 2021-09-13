@@ -37,8 +37,7 @@ Examples
 
    compute 1 all threebody 100 100
    compute 1 all threebody 100 100 cutoff 5.0
-   compute 1 all threebody 100 100 skip 10
-   compute 1 all threebody 100 100 skip 20 cutoff 16.0
+   compute 1 all threebody/angle/cos 100 100 skip 20 cutoff 16.0
 
 Description
 """""""""""
@@ -230,14 +229,18 @@ but it allows for more compact storage of this data, while also
 avoiding the domain where the calculation is invalid.
 
 Compute style *threebody/angle/cos* outputs a global array where
-:math:`g^{(3)}(u,v,\alpha_{uv})` multiplied by an angular factor
-:math:`\cos\alpha_{uv}` is integrated over the angle coordinate, i.e.
+:math:`g^{(3)}(u,v,\alpha_{uv})` is integrated over the angle coordinate,
+i.e.
       
 .. math::
-   2\int_0^{\pi}g^{(3)}_{2d}(u,v,\alpha_{uv})\cos\alpha_{uv}
+   2\int_0^{\pi}g^{(3)}_{2d}(u,v,\alpha_{uv})f(\cos\alpha_{uv})
    d\alpha_{uv},\\
-   \int_0^{\pi} g^{(3)}_{3d}(u,v,\alpha_{uv})\cos\alpha_{uv}
-   \sin\alpha_{uv} d\alpha_{uv}.
+   \int_0^{\pi} g^{(3)}_{3d}(u,v,\alpha_{uv})f(\cos\alpha_{uv})
+   \sin\alpha_{uv} d\alpha_{uv}
+
+where the angular factor :math:`f(\cos\alpha_{uv})=1` for the first
+output column and :math:`f(\cos\alpha_{uv})=\cos\alpha_{uv}` for
+the second output column.
 
 The angle integral is computed via summing over the *Nanglebins*.
 The resulting arrays are therefore only dependent on the two

@@ -55,7 +55,7 @@ ComputeThreeBodyAngleCos::ComputeThreeBodyAngleCos(LAMMPS *lmp, int narg, char *
 {
   
   size_array_rows = (npos_bins-2*nskip)*(npos_bins-2*nskip+1)/2;
-  size_array_cols = 3;
+  size_array_cols = 4;
 
   
   memory->create(array,size_array_rows,size_array_cols,"rdf:array");  
@@ -285,8 +285,7 @@ void ComputeThreeBodyAngleCos::set_array(double constant, double normfac,
   double vfrac;
 
   int alpha_bin,ij_bin,ik_bin;
-  double cosalpha;
-  double gr;
+  double gr,gr_cos;
   
   int flat;
   
@@ -303,6 +302,7 @@ void ComputeThreeBodyAngleCos::set_array(double constant, double normfac,
       vupper = (ik_bin+1)*deldist;	  
 
       gr = 0.0;
+      gr_cos = 0.0;
       
       for (alpha_bin = 0; alpha_bin < nangle_bins; alpha_bin ++ ) {
 
@@ -311,15 +311,19 @@ void ComputeThreeBodyAngleCos::set_array(double constant, double normfac,
 			      alpha_bin);
 
 	if (vfrac * normfac != 0.0) {
-	  gr += histall[alpha_bin][ij_bin][ik_bin]/(vfrac *normfac);
+	  gr += histall[alpha_bin][ij_bin][ik_bin]/(vfrac *normfac)*delalpha;
+	  gr_cos += (histall[alpha_bin][ij_bin][ik_bin]/(vfrac *normfac)
+		     *cos((alpha_bin + 0.5)*delalpha));
 	} else {
 	  gr += 0.0;
+	  gr_cos += 0.0;
 	}
 
 	flat = flat_index(ij_bin, ik_bin, npos_bins,nskip);
 	array[flat][0] = (ij_bin + 0.5)*deldist;
 	array[flat][1] = (ik_bin + 0.5)*deldist;
 	array[flat][2] = gr;
+	array[flat][3] = gr_cos;
       }
     }
   }
@@ -341,8 +345,7 @@ double compute_3Dvf(double ulower, double uupper,
   return ((uupper*uupper*uupper - ulower*ulower*ulower)/3.0
 	  * (vupper*vupper*vupper - vlower*vlower*vlower)/3.0
 	  * (aupper-alower)
-	  / ( cos((alpha_bin + 0.5)*delalpha)
-	      *sin((alpha_bin + 0.5)*delalpha)*delalpha));
+	  / ( sin((alpha_bin + 0.5)*delalpha)*delalpha));
 }
 
 double compute_2Dvf(double ulower, double uupper,
@@ -352,7 +355,7 @@ double compute_2Dvf(double ulower, double uupper,
 
   return ( (uupper*uupper - ulower*ulower)/2.0
 	   * (vupper*vupper - vlower*vlower)/2.0
-	   /(  2*cos((alpha_bin+0.5)*delalpha)));
+	   /(  2));
 }
 
 
