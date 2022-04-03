@@ -288,8 +288,9 @@ bigint ReaderNative::read_header(double box[3][3], int &boxinfo, int &triclinic,
       fieldindex[i] = find_label("muy", labels);
     else if (fieldtype[i] == MUZ)
       fieldindex[i] = find_label("muz", labels);
-    
 
+
+    
     else if (fieldtype[i] == Q)
       fieldindex[i] = find_label("q", labels);
 

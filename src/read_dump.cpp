@@ -285,7 +285,7 @@ bigint ReadDump::seek(bigint nrequest, int exact)
       ntimestep = -1;
       if (multiproc) {
         std::string multiname = files[ifile];
-        multiname.replace(multiname.find("%"),1,"0");
+        multiname.replace(multiname.find('%'),1,"0");
         readers[0]->open_file(multiname.c_str());
       } else readers[0]->open_file(files[ifile]);
 
@@ -329,7 +329,7 @@ bigint ReadDump::seek(bigint nrequest, int exact)
     for (int i = 0; i < nreader; i++) {
       if (me == 0 && i == 0) continue;    // proc 0, reader 0 already found it
       std::string multiname = files[currentfile];
-      multiname.replace(multiname.find("%"),1,fmt::format("{}",firstfile+i));
+      multiname.replace(multiname.find('%'),1,fmt::format("{}",firstfile+i));
       readers[i]->open_file(multiname.c_str());
 
       bigint step;
@@ -377,7 +377,7 @@ bigint ReadDump::next(bigint ncurrent, bigint nlast, int nevery, int nskip)
       if (ifile != currentfile) {
         if (multiproc) {
           std::string multiname = files[ifile];
-          multiname.replace(multiname.find("%"),1,"0");
+          multiname.replace(multiname.find('%'),1,"0");
           readers[0]->open_file(multiname.c_str());
         } else readers[0]->open_file(files[ifile]);
       }
@@ -431,7 +431,7 @@ bigint ReadDump::next(bigint ncurrent, bigint nlast, int nevery, int nskip)
     for (int i = 0; i < nreader; i++) {
       if (me == 0 && i == 0) continue;
       std::string multiname = files[currentfile];
-      multiname.replace(multiname.find("%"),1,fmt::format("{}",firstfile+i));
+      multiname.replace(multiname.find('%'),1,fmt::format("{}",firstfile+i));
       readers[i]->open_file(multiname.c_str());
 
       bigint step;
@@ -830,8 +830,8 @@ void ReadDump::process_atoms()
   double **x = atom->x;
   double **v = atom->v;
   double *q = atom->q;
-  double **mu = atom->mu;
   double **f = atom->f;
+  double **mu = atom->mu;
   tagint *tag = atom->tag;
   imageint *image = atom->image;
   tagint map_tag_max = atom->map_tag_max;
@@ -904,7 +904,7 @@ void ReadDump::process_atoms()
         case FZ:
           f[m][2] = fields[i][ifield];
           break;
-        case MUX:
+	case MUX:
           mu[m][0] = fields[i][ifield];
           break;
         case MUY:
@@ -913,6 +913,7 @@ void ReadDump::process_atoms()
         case MUZ:
           mu[m][2] = fields[i][ifield];
           break;
+
         }
       }
 
@@ -1190,7 +1191,7 @@ int ReadDump::fields_and_keywords(int narg, char **arg)
     if ((type == MUX && !atom->mu_flag) || (type == MUY && !atom->mu_flag)
 	|| (type == MUZ && !atom->mu_flag))
       error->all(FLERR,"Read dump of atom property (dipole) "
-		 "that isn't allocated");
+		 "that isn't allocated");    
     fieldtype[nfield++] = type;
     iarg++;
   }
@@ -1231,32 +1232,26 @@ int ReadDump::fields_and_keywords(int narg, char **arg)
       iarg += 2;
     } else if (strcmp(arg[iarg],"box") == 0) {
       if (iarg+2 > narg) error->all(FLERR,"Illegal read_dump command");
-      if (strcmp(arg[iarg+1],"yes") == 0) boxflag = 1;
-      else if (strcmp(arg[iarg+1],"no") == 0) boxflag = 0;
-      else error->all(FLERR,"Illegal read_dump command");
+      boxflag = utils::logical(FLERR,arg[iarg+1],false,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg],"replace") == 0) {
       if (iarg+2 > narg) error->all(FLERR,"Illegal read_dump command");
-      if (strcmp(arg[iarg+1],"yes") == 0) replaceflag = 1;
-      else if (strcmp(arg[iarg+1],"no") == 0) replaceflag = 0;
-      else error->all(FLERR,"Illegal read_dump command");
+      replaceflag = utils::logical(FLERR,arg[iarg+1],false,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg],"purge") == 0) {
       if (iarg+2 > narg) error->all(FLERR,"Illegal read_dump command");
-      if (strcmp(arg[iarg+1],"yes") == 0) purgeflag = 1;
-      else if (strcmp(arg[iarg+1],"no") == 0) purgeflag = 0;
-      else error->all(FLERR,"Illegal read_dump command");
+      purgeflag = utils::logical(FLERR,arg[iarg+1],false,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg],"trim") == 0) {
       if (iarg+2 > narg) error->all(FLERR,"Illegal read_dump command");
-      if (strcmp(arg[iarg+1],"yes") == 0) trimflag = 1;
-      else if (strcmp(arg[iarg+1],"no") == 0) trimflag = 0;
-      else error->all(FLERR,"Illegal read_dump command");
+      trimflag = utils::logical(FLERR,arg[iarg+1],false,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg],"add") == 0) {
       if (iarg+2 > narg) error->all(FLERR,"Illegal read_dump command");
       if (strcmp(arg[iarg+1],"yes") == 0) addflag = YESADD;
       else if (strcmp(arg[iarg+1],"no") == 0) addflag = NOADD;
+      else if (strcmp(arg[iarg+1],"true") == 0) addflag = YESADD;
+      else if (strcmp(arg[iarg+1],"false") == 0) addflag = NOADD;
       else if (strcmp(arg[iarg+1],"keep") == 0) addflag = KEEPADD;
       else error->all(FLERR,"Illegal read_dump command");
       iarg += 2;
@@ -1271,15 +1266,11 @@ int ReadDump::fields_and_keywords(int narg, char **arg)
       iarg += 3;
     } else if (strcmp(arg[iarg],"scaled") == 0) {
       if (iarg+2 > narg) error->all(FLERR,"Illegal read_dump command");
-      if (strcmp(arg[iarg+1],"yes") == 0) scaleflag = 1;
-      else if (strcmp(arg[iarg+1],"no") == 0) scaleflag = 0;
-      else error->all(FLERR,"Illegal read_dump command");
+      scaleflag = utils::logical(FLERR,arg[iarg+1],false,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg],"wrapped") == 0) {
       if (iarg+2 > narg) error->all(FLERR,"Illegal read_dump command");
-      if (strcmp(arg[iarg+1],"yes") == 0) wrapflag = 1;
-      else if (strcmp(arg[iarg+1],"no") == 0) wrapflag = 0;
-      else error->all(FLERR,"Illegal read_dump command");
+      wrapflag = utils::logical(FLERR,arg[iarg+1],false,lmp);
       iarg += 2;
     } else if (strcmp(arg[iarg],"format") == 0) {
       if (iarg+2 > narg) error->all(FLERR,"Illegal read_dump command");
@@ -1329,7 +1320,7 @@ int ReadDump::whichtype(char *str)
   else if (strcmp(str,"fz") == 0) type = FZ;
   else if (strcmp(str,"mux") == 0) type = MUX;
   else if (strcmp(str,"muy") == 0) type = MUY;
-  else if (strcmp(str,"muz") == 0) type = MUZ;
+  else if (strcmp(str,"muz") == 0) type = MUZ;  
   return type;
 }
 
