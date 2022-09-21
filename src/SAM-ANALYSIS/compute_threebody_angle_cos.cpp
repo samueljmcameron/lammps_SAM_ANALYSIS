@@ -311,7 +311,7 @@ void ComputeThreeBodyAngleCos::set_array(double constant, double normfac,
 			      alpha_bin);
 
 	if (vfrac * normfac != 0.0) {
-	  gr += histall[alpha_bin][ij_bin][ik_bin]/(vfrac *normfac);
+	  gr += histall[alpha_bin][ij_bin][ik_bin]/(vfrac *normfac)*delalpha;
 	  gr_cos += (histall[alpha_bin][ij_bin][ik_bin]/(vfrac *normfac)
 		     *cos((alpha_bin + 0.5)*delalpha));
 	} else {

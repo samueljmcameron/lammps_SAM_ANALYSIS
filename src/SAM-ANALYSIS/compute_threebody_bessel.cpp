@@ -172,17 +172,8 @@ void ComputeThreeBodyBessel::init()
   //   (until next reneighbor), so it needs to contain atoms further
   //   than cutoff_user apart, just like a normal neighbor list does
 
-  int irequest = neighbor->request(this,instance_me);
-  neighbor->requests[irequest]->pair = 0;
-  neighbor->requests[irequest]->compute = 1;
-  neighbor->requests[irequest]->occasional = 1;
-  if (cutflag) {
-    neighbor->requests[irequest]->cut = 1;
-    neighbor->requests[irequest]->cutoff = mycutneigh;
-  }
-  // need full neighbor list
-  neighbor->requests[irequest]->half = 0;
-  neighbor->requests[irequest]->full = 1;
+  auto req = neighbor->add_request(this, NeighConst::REQ_FULL | NeighConst::REQ_OCCASIONAL);
+  if (cutflag) req->set_cutoff(mycutneigh);
   
 }
 

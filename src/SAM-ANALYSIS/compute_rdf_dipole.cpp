@@ -213,14 +213,9 @@ void ComputeRDFDipole::init()
   //   (until next reneighbor), so it needs to contain atoms further
   //   than cutoff_user apart, just like a normal neighbor list does
 
-  int irequest = neighbor->request(this,instance_me);
-  neighbor->requests[irequest]->pair = 0;
-  neighbor->requests[irequest]->compute = 1;
-  neighbor->requests[irequest]->occasional = 1;
-  if (cutflag) {
-    neighbor->requests[irequest]->cut = 1;
-    neighbor->requests[irequest]->cutoff = mycutneigh;
-  }
+  auto req = neighbor->add_request(this, NeighConst::REQ_OCCASIONAL);
+  if (cutflag) req->set_cutoff(mycutneigh);
+
 }
 
 /* ---------------------------------------------------------------------- */
