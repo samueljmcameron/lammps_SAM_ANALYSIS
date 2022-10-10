@@ -831,6 +831,7 @@ void ReadDump::process_atoms()
   double **v = atom->v;
   double *q = atom->q;
   double **f = atom->f;
+  double **mu = atom->mu;
   tagint *tag = atom->tag;
   imageint *image = atom->image;
   tagint map_tag_max = atom->map_tag_max;
@@ -904,13 +905,13 @@ void ReadDump::process_atoms()
           f[m][2] = fields[i][ifield];
           break;
         case MUX:
-          f[m][2] = fields[i][ifield];
+          mu[m][0] = fields[i][ifield];
           break;
         case MUY:
-          f[m][2] = fields[i][ifield];
+          mu[m][1] = fields[i][ifield];
           break;
         case MUZ:
-          f[m][2] = fields[i][ifield];
+          mu[m][2] = fields[i][ifield];
           break;
 	  
 
