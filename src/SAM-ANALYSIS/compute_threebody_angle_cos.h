@@ -36,6 +36,7 @@ class ComputeThreeBodyAngleCos : public ComputeThreeBody {
   void set_array(double, double,
 		 double (*)(double,double,double,double,double,int));
 
+  int flat_index_no_theta(int , int , int ,int);
 
 };
 

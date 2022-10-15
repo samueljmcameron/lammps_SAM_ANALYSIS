@@ -46,7 +46,6 @@ static double compute_2Dvf(double ulower, double uupper,
 			   double vlower, double vupper,
 			   double delalpha, int alpha_bin );
 
-static int flat_index(int ubin, int vbin, int Nuv,int nskip);
 
 /* ---------------------------------------------------------------------- */
 
@@ -57,7 +56,6 @@ ComputeThreeBodyAngleCos::ComputeThreeBodyAngleCos(LAMMPS *lmp, int narg, char *
   size_array_rows = (npos_bins-2*nskip)*(npos_bins-2*nskip+1)/2;
   size_array_cols = 4;
 
-  
   memory->create(array,size_array_rows,size_array_cols,"rdf:array");  
   
   dynamic = 0;
@@ -85,6 +83,7 @@ void ComputeThreeBodyAngleCos::compute_array()
 {
   int i,j,m,ii,jj,inum,jnum,itype,jtype,ipair,jpair;
   int ij_bin,ik_bin,alpha_bin,dum_jk_bin;
+  int flat;
   int k,kk,knum,ktype,kpair;
   double xtmp,ytmp,ztmp;
   double xij,yij,zij,xik,yik,zik,rij,rik,rjk,alpha;
@@ -118,10 +117,15 @@ void ComputeThreeBodyAngleCos::compute_array()
 
   // zero the histogram counts
 
-  for (i = 0; i < nangle_bins; i++)
-    for (j = 0; j < npos_bins; j++)
-      for (k = 0; k < npos_bins; k++)
-	hist[i][j][k] = 0;
+  for (ij_bin = nskip; ij_bin < (npos_bins-nskip); ij_bin++) 
+    for (ik_bin = nskip; ik_bin < npos_bins-ij_bin; ik_bin++) 
+      for (alpha_bin = 0; alpha_bin < nangle_bins; alpha_bin ++ ) {
+
+	flat = flat_index(ij_bin, ik_bin, alpha_bin, npos_bins,
+			  nangle_bins,nskip);
+	hist[flat] = 0;
+      }
+
 
   // tally the three body
   // both atom i and j must be in fix group
@@ -226,7 +230,9 @@ void ComputeThreeBodyAngleCos::compute_array()
 		     "Error in compute threebody.");
 	}
 
-	hist[alpha_bin][ij_bin][ik_bin] += 1.0;
+	flat = flat_index(ij_bin, ik_bin, alpha_bin, npos_bins,
+			  nangle_bins,nskip);
+	hist[flat] += 1.0;
 
       }
     }
@@ -234,7 +240,7 @@ void ComputeThreeBodyAngleCos::compute_array()
 
   // sum histograms across procs
 
-  MPI_Allreduce(hist[0][0],histall[0][0],nbin_total,MPI_DOUBLE,MPI_SUM,world);
+  MPI_Allreduce(hist,histall,nbin_total,MPI_DOUBLE,MPI_SUM,world);
 
   // convert counts to g(r) and coord(r) and copy into output array
   // vfrac = fraction of volume in shell m
@@ -310,16 +316,18 @@ void ComputeThreeBodyAngleCos::set_array(double constant, double normfac,
 	vfrac = constant * vf(ulower,uupper,vlower,vupper,delalpha,
 			      alpha_bin);
 
+	flat = flat_index(ij_bin, ik_bin, alpha_bin, npos_bins,
+			  nangle_bins,nskip);
 	if (vfrac * normfac != 0.0) {
-	  gr += histall[alpha_bin][ij_bin][ik_bin]/(vfrac *normfac)*delalpha;
-	  gr_cos += (histall[alpha_bin][ij_bin][ik_bin]/(vfrac *normfac)
+	  gr += histall[flat]/(vfrac *normfac)*delalpha;
+	  gr_cos += (histall[flat]/(vfrac *normfac)
 		     *cos((alpha_bin + 0.5)*delalpha));
 	} else {
 	  gr += 0.0;
 	  gr_cos += 0.0;
 	}
 
-	flat = flat_index(ij_bin, ik_bin, npos_bins,nskip);
+	flat = flat_index_no_theta(ij_bin, ik_bin, npos_bins,nskip);
 	array[flat][0] = (ij_bin + 0.5)*deldist;
 	array[flat][1] = (ik_bin + 0.5)*deldist;
 	array[flat][2] = gr;
@@ -329,6 +337,16 @@ void ComputeThreeBodyAngleCos::set_array(double constant, double normfac,
   }
 
   return;
+}
+
+
+int ComputeThreeBodyAngleCos::flat_index_no_theta(int ubin, int vbin,
+						  int Nuv,int nsk)
+{
+
+  int udum = ubin - nsk;
+  return (vbin-nsk + udum*(Nuv-2*nsk+1)
+	  - (udum * (udum+1) ) / 2);
 }
 
 
@@ -360,10 +378,3 @@ double compute_2Dvf(double ulower, double uupper,
 
 
 
-int flat_index(int ubin, int vbin, int Nuv,int nskip)
-{
-
-  int udum = ubin - nskip;
-  return (vbin-nskip + udum*(Nuv-2*nskip+1)
-	  - (udum * (udum+1) ) / 2);
-}

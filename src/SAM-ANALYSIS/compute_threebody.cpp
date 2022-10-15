@@ -47,8 +47,6 @@ static double compute_2Dvf(double ulower, double uupper,
 			   double /* delalpha */,
 			   int /* alpha_bin */);
 
-static int flat_index(int ubin, int vbin, int abin, int Nuv, int Na,
-		      int nskip);
 
 /* ---------------------------------------------------------------------- */
 
@@ -69,7 +67,7 @@ ComputeThreeBody::ComputeThreeBody(LAMMPS *lmp, int narg, char **arg,
   nangle_bins = utils::inumeric(FLERR,arg[4],false,lmp);
   if (nangle_bins < 1) error->all(FLERR,"Illegal compute three body command");
 
-  nbin_total = npos_bins*npos_bins*nangle_bins;
+
   // optional args
   // nargpair = # of pairwise args, starting at iarg = 5
 
@@ -113,12 +111,12 @@ ComputeThreeBody::ComputeThreeBody(LAMMPS *lmp, int narg, char **arg,
   
   size_array_rows = (npos_bins-2*nskip)*(npos_bins-2*nskip+1)*nangle_bins/2;
   size_array_cols = 4;
-  
-  memory->create(hist,nangle_bins,npos_bins,npos_bins,"rdf:hist");
-  memory->create(histall,nangle_bins,npos_bins,npos_bins,"rdf:histall");    
+  nbin_total = size_array_rows;
 
+  memory->create(hist,nbin_total,"rdf:hist");
+  memory->create(histall,nbin_total,"rdf:histall");    
+    
   if (alloc_array) {
-
 
     memory->create(array,size_array_rows,size_array_cols,"rdf:array");  
 
@@ -254,6 +252,7 @@ void ComputeThreeBody::compute_array()
   int i,j,m,ii,jj,inum,jnum,itype,jtype,ipair,jpair;
   int ij_bin,ik_bin,alpha_bin,dum_jk_bin;
   int k,kk,knum,ktype,kpair;
+  int flat;
   double xtmp,ytmp,ztmp;
   double xij,yij,zij,xik,yik,zik,rij,rik,rjk,alpha;
   int *ilist,*jlist,*numneigh,**firstneigh;
@@ -286,11 +285,16 @@ void ComputeThreeBody::compute_array()
 
   // zero the histogram counts
 
-  for (i = 0; i < nangle_bins; i++)
-    for (j = 0; j < npos_bins; j++)
-      for (k = 0; k < npos_bins; k++)
-	hist[i][j][k] = 0;
 
+  for (ij_bin = nskip; ij_bin < (npos_bins-nskip); ij_bin++) 
+    for (ik_bin = nskip; ik_bin < npos_bins-ij_bin; ik_bin++) 
+      for (alpha_bin = 0; alpha_bin < nangle_bins; alpha_bin ++ ) {
+
+	flat = flat_index(ij_bin, ik_bin, alpha_bin, npos_bins,
+			  nangle_bins,nskip);
+	hist[flat] = 0;
+      }
+  
   // tally the three body
   // both atom i and j must be in fix group
   // itype,jtype must have been specified by user
@@ -394,7 +398,10 @@ void ComputeThreeBody::compute_array()
 		     "Error in compute threebody.");
 	}
 
-	hist[alpha_bin][ij_bin][ik_bin] += 1.0;
+
+	flat = flat_index(ij_bin, ik_bin, alpha_bin, npos_bins,
+			  nangle_bins,nskip);
+	hist[flat] += 1.0;
 
       }
     }
@@ -402,7 +409,7 @@ void ComputeThreeBody::compute_array()
 
   // sum histograms across procs
 
-  MPI_Allreduce(hist[0][0],histall[0][0],nbin_total,MPI_DOUBLE,MPI_SUM,world);
+  MPI_Allreduce(hist,histall,nbin_total,MPI_DOUBLE,MPI_SUM,world);
 
   // convert counts to g(r) and coord(r) and copy into output array
   // vfrac = fraction of volume in shell m
@@ -475,15 +482,16 @@ void ComputeThreeBody::set_array(double constant, double normfac,
 	
 	vfrac = constant * vf(ulower,uupper,vlower,vupper,delalpha,
 			      alpha_bin);
+
+	flat = flat_index(ij_bin, ik_bin, alpha_bin, npos_bins,
+			  nangle_bins,nskip);
 	
 	if (vfrac * normfac != 0.0) {
-	  gr = histall[alpha_bin][ij_bin][ik_bin]/(vfrac *normfac);
+	  gr = histall[flat]/(vfrac *normfac);
 	} else {
 	  gr = 0.0;
 	}
 
-	flat = flat_index(ij_bin, ik_bin, alpha_bin, npos_bins,
-			  nangle_bins,nskip);
 	array[flat][0] = (ij_bin + 0.5)*deldist;
 	array[flat][1] = (ik_bin + 0.5)*deldist;
 	array[flat][2] = (alpha_bin + 0.5)*delalpha;
@@ -495,6 +503,16 @@ void ComputeThreeBody::set_array(double constant, double normfac,
 
   return;
 }
+
+int ComputeThreeBody::flat_index(int ubin, int vbin, int abin,
+				 int Nuv, int Na, int nsk)
+{
+
+  int udum = ubin - nsk;
+  return abin + (vbin-nsk + udum*(Nuv-2*nsk+1)
+		 - (udum * (udum+1) ) / 2)*Na;
+}
+
 
 
 double compute_3Dvf(double ulower, double uupper,
@@ -524,11 +542,3 @@ double compute_2Dvf(double ulower, double uupper,
 
 
 
-int flat_index(int ubin, int vbin, int abin, int Nuv, int Na,
-	       int nskip)
-{
-
-  int udum = ubin - nskip;
-  return abin + (vbin-nskip + udum*(Nuv-2*nskip+1)
-		 - (udum * (udum+1) ) / 2)*Na;
-}

@@ -37,14 +37,14 @@ class ComputeThreeBody : public Compute {
   int nangle_bins;               // # of alpha bins
   int cutflag;                   // user cutoff flag
 
-  bigint nbin_total;             // nbin_dist*nbin_dist*nbin_theta
+  int nbin_total;
   double deldist,deldistinv;     // bin width and its inverse for distance
   double delalpha,delalphainv;   // bin width and its inverse for angle
   double cutoff_user;            // user-specified cutoff
   double mycutneigh;             // user-specified cutoff + neighbor skin
   int nskip;                     // user-specified number of bins to skip in saving
-  double ***hist;                 // histogram bins
-  double ***histall;              // summed histogram bins across all procs
+  double *hist;                 // histogram bins
+  double *histall;              // summed histogram bins across all procs
 
   int typecount;
   int icount,jcount;
@@ -53,6 +53,9 @@ class ComputeThreeBody : public Compute {
   class NeighList *list; // half neighbor list
   void init_norm();
   bigint natoms_old;
+
+  int flat_index(int , int , int , int , int ,int );
+
 
  private:
   void set_array(double, double,
