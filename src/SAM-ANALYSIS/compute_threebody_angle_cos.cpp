@@ -224,6 +224,14 @@ void ComputeThreeBodyAngleCos::compute_array()
 	
 	if (ij_bin >= npos_bins || ik_bin >=npos_bins
 	    || dum_jk_bin >= npos_bins) continue;
+
+	if (ij_bin < nskip || ik_bin < nskip) continue;
+
+	if (ij_bin >= (npos_bins-nskip) 
+	    || ik_bin >= (npos_bins-nskip)
+	    || ik_bin >= (npos_bins-ij_bin)) continue;
+
+
 	if (alpha_bin >= nangle_bins) {
 	  printf("alpha = %f, alpha_bin = %d\n",alpha,alpha_bin);
 	  error->one(FLERR,"theta > 3.1415 somehow? "
